@@ -2,6 +2,7 @@ const wsUrl = 'wss://node-server-ws.onrender.com';
 let socket = null;
 let currentTasks = [];
 let reconnectTimer = null;
+const sessionId = Math.random().toString(36).substring(2, 11); // Generate unique session ID
 
 const elements = {
     statusDot: document.getElementById('status-dot'),
@@ -38,7 +39,7 @@ const priorityMapping = {
 function updateStatus(status) {
     elements.statusDot.className = 'status-dot';
     elements.statusText.textContent = status.charAt(0).toUpperCase() + status.slice(1);
-    
+
     if (status === 'connected') {
         elements.statusDot.classList.add('connected');
         elements.connectBtn.disabled = true;
@@ -72,7 +73,7 @@ function renderBoard(tasks) {
     tasks.forEach((task, index) => {
         const title = (task.Title || '').toLowerCase();
         const desc = (task.Description || '').toLowerCase();
-        
+
         if (filter && !title.includes(filter) && !desc.includes(filter)) {
             return;
         }
@@ -84,7 +85,7 @@ function renderBoard(tasks) {
             columnCounts[statusKey]++;
             const card = createTaskCard(task, index);
             listEl.appendChild(card);
-            
+
             // Refresh Lucide Icons for this specific card
             if (window.lucide) {
                 window.lucide.createIcons({
@@ -128,7 +129,7 @@ function createTaskCard(task, index) {
 
 function connect() {
     if (socket && socket.readyState === WebSocket.OPEN) return;
-    
+
     updateStatus('connecting');
 
     try {
@@ -136,10 +137,11 @@ function connect() {
 
         socket.onopen = () => {
             updateStatus('connected');
-            
+
             // Request initial sync
             socket.send(JSON.stringify({
                 sender: 'mobile',
+                senderId: sessionId,
                 type: 'request_sync',
                 payload: 'Initialize Dashboard'
             }));
@@ -153,6 +155,13 @@ function connect() {
         socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
+
+                // Filtering: If targetId is set and doesn't match our sessionId, ignore the message
+                if (data.targetId && data.targetId !== sessionId) {
+                    console.log(`Skipping message targeted for ${data.targetId}`);
+                    return;
+                }
+
                 if (data.type === 'task_sync' && data.payload) {
                     const taskData = JSON.parse(data.payload);
                     if (taskData.Tasks) {
@@ -169,7 +178,7 @@ function connect() {
             if (elements.statusText.textContent.toLowerCase() !== 'error') {
                 updateStatus('disconnected');
             }
-            
+
             // Auto-reconnect logic
             if (!reconnectTimer) {
                 reconnectTimer = setInterval(connect, 5000);
