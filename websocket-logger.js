@@ -136,6 +136,14 @@ function connect() {
 
         socket.onopen = () => {
             updateStatus('connected');
+            
+            // Request initial sync
+            socket.send(JSON.stringify({
+                sender: 'mobile',
+                type: 'request_sync',
+                payload: 'Initialize Dashboard'
+            }));
+
             if (reconnectTimer) {
                 clearInterval(reconnectTimer);
                 reconnectTimer = null;
