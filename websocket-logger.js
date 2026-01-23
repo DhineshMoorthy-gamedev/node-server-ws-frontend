@@ -4,6 +4,7 @@ const wsUrl = (location.hostname === 'localhost' || location.hostname === '127.0
 let socket = null;
 let currentTasks = [];
 let reconnectTimer = null;
+let currentProjectId = localStorage.getItem('lastProjectId') || '';
 const sessionId = Math.random().toString(36).substring(2, 11); // Generate unique session ID
 
 const elements = {
@@ -31,6 +32,10 @@ const elements = {
         container: document.getElementById('editor-status-container'),
         dot: document.getElementById('editor-status-dot'),
         text: document.getElementById('editor-status-text')
+    },
+    project: {
+        input: document.getElementById('project-id-input'),
+        display: document.getElementById('project-display')
     }
 };
 
@@ -69,12 +74,29 @@ function updateStatus(status) {
     }
 }
 
-function updateEditorStatus(isOnline) {
+function updateEditorStatus(isOnline, projectId = null) {
     if (!elements.editorStatus.container) return;
+
+    // Only update if the projectId matches our current project
+    if (projectId && projectId !== currentProjectId) return;
 
     elements.editorStatus.container.style.display = 'flex';
     elements.editorStatus.dot.className = 'status-dot ' + (isOnline ? 'connected' : 'error');
     elements.editorStatus.text.textContent = isOnline ? 'Editor Online' : 'Editor Offline';
+}
+
+function updateProjectDisplay() {
+    if (elements.project.display) {
+        elements.project.display.textContent = currentProjectId;
+        elements.project.display.style.display = currentProjectId ? 'inline-block' : 'none';
+    }
+    if (elements.project.input) {
+        elements.project.input.value = currentProjectId;
+    }
+}
+
+function showStatusMessage(msg) {
+    elements.lastSyncTime.textContent = msg.toUpperCase();
 }
 
 function renderBoard(tasks, isCached = false) {
@@ -84,6 +106,16 @@ function renderBoard(tasks, isCached = false) {
     // Clear and Reset
     Object.values(elements.lists).forEach(list => list.innerHTML = '');
     const columnCounts = { Pending: 0, InProgress: 0, Completed: 0, Blocked: 0 };
+
+    // If no project is specified (explicitly), don't show any cards
+    if (!currentProjectId) {
+        Object.keys(columnCounts).forEach(key => {
+            elements.counts[key].textContent = '0';
+        });
+        elements.lastSyncTime.textContent = 'Please specify a Project ID to view tasks.';
+        updateEditorStatus(false);
+        return;
+    }
 
     tasks.forEach((task, index) => {
         const title = (task.Title || '').toLowerCase();
@@ -127,10 +159,25 @@ function createTaskCard(task, index) {
     const priority = typeof task.Priority === 'number' ? priorityMapping[task.Priority] : (task.Priority || 'Medium');
     const initials = task.Assignee ? task.Assignee.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : '??';
 
+    let linksHtml = '';
+    if (task.Links && task.Links.length > 0) {
+        linksHtml = `
+            <div class="task-links">
+                ${task.Links.map(link => `
+                    <div class="link-item" title="${link.ObjectName} (${link.ObjectType || 'Unity Object'})">
+                        <i data-lucide="${getLinkIcon(link.ObjectType)}"></i>
+                        <span>${link.ObjectName || 'Unnamed Link'}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
     card.innerHTML = `
         <div class="priority-tag priority-${priority}"></div>
         <div class="task-title">${task.Title || 'Untitled Sequence'}</div>
         <div class="task-desc">${task.Description || 'No metadata available for this task.'}</div>
+        ${linksHtml}
         <div class="task-footer">
             <div class="task-assignee">
                 <div class="avatar-circle">${initials}</div>
@@ -143,6 +190,20 @@ function createTaskCard(task, index) {
     return card;
 }
 
+function getLinkIcon(type) {
+    if (!type) return 'link';
+    const t = type.toLowerCase();
+    if (t.includes('gameobject')) return 'box';
+    if (t.includes('material')) return 'layers';
+    if (t.includes('texture')) return 'image';
+    if (t.includes('script') || t.includes('code')) return 'code';
+    if (t.includes('scene')) return 'map';
+    if (t.includes('audio')) return 'music';
+    if (t.includes('animation')) return 'film';
+    if (t.includes('prefab')) return 'package';
+    return 'file';
+}
+
 function connect() {
     if (socket && socket.readyState === WebSocket.OPEN) return;
 
@@ -153,14 +214,21 @@ function connect() {
 
         socket.onopen = () => {
             updateStatus('connected');
+            updateProjectDisplay();
+            showStatusMessage(`CONNECTED. PROJECT: ${currentProjectId}`);
 
-            // Request initial sync
-            socket.send(JSON.stringify({
-                sender: 'mobile',
-                senderId: sessionId,
-                type: 'request_sync',
-                payload: 'Initialize Dashboard'
-            }));
+            // Only request initial sync if project is set
+            if (currentProjectId) {
+                socket.send(JSON.stringify({
+                    sender: 'mobile',
+                    senderId: sessionId,
+                    projectId: currentProjectId,
+                    type: 'request_sync',
+                    payload: 'Initialize Dashboard'
+                }));
+            } else {
+                showStatusMessage("Select a Project to begin");
+            }
 
             if (reconnectTimer) {
                 clearInterval(reconnectTimer);
@@ -171,7 +239,13 @@ function connect() {
         socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                console.log(`Received ${data.type} from ${data.sender}`);
+                console.log(`Received ${data.type} from ${data.sender} [Project: ${data.projectId || 'none'}]`);
+
+                // Strict Filtering: Project ID mismatch
+                // If message has no projectId or it doesn't match our current selection, ignore it
+                if (data.projectId !== currentProjectId) {
+                    return;
+                }
 
                 // Filtering: If targetId is set and doesn't match our sessionId, ignore the message
                 if (data.targetId && data.targetId !== sessionId) {
@@ -180,19 +254,29 @@ function connect() {
                 }
 
                 if (data.type === 'editor_status') {
-                    updateEditorStatus(data.status === 'online');
+                    updateEditorStatus(data.status === 'online', data.projectId);
+                }
+
+                if (data.type === 'status') {
+                    showStatusMessage(data.payload);
+                    if (data.editorOffline !== undefined) {
+                        updateEditorStatus(!data.editorOffline, data.projectId);
+                    }
                 }
 
                 if (data.type === 'task_sync' && data.payload) {
                     if (data.editorOffline !== undefined) {
-                        updateEditorStatus(!data.editorOffline);
+                        updateEditorStatus(!data.editorOffline, data.projectId);
                     } else if (data.sender === 'editor') {
-                        updateEditorStatus(true);
+                        updateEditorStatus(true, data.projectId);
                     }
 
                     const taskData = JSON.parse(data.payload);
-                    if (taskData.Tasks) {
+                    if (taskData.Tasks && taskData.Tasks.length > 0) {
                         renderBoard(taskData.Tasks, data.isCached);
+                    } else {
+                        renderBoard([]);
+                        showStatusMessage(`No tasks found for project: ${currentProjectId}`);
                     }
                 }
             } catch (e) {
@@ -238,6 +322,34 @@ elements.connectBtn.addEventListener('click', () => {
 });
 elements.disconnectBtn.addEventListener('click', disconnect);
 elements.searchBox.addEventListener('input', () => renderBoard(currentTasks));
+elements.project.input.addEventListener('change', () => {
+    const val = elements.project.input.value.trim();
+    currentProjectId = val;
+    localStorage.setItem('lastProjectId', currentProjectId);
+
+    // Refresh UI for new project context
+    updateProjectDisplay();
+    renderBoard([]); // Clear current board
+
+    if (!currentProjectId) {
+        updateEditorStatus(false);
+        elements.lastSyncTime.textContent = 'Please select a project.';
+        return;
+    }
+
+    elements.lastSyncTime.textContent = 'Last sync: Switching project...';
+
+    // Request sync for new project
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({
+            sender: 'mobile',
+            senderId: sessionId,
+            projectId: currentProjectId,
+            type: 'request_sync',
+            payload: 'Project Switch Sync'
+        }));
+    }
+});
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {

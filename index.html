@@ -22,10 +22,13 @@
                     <i data-lucide="layers"></i>
                     <h1>UnityDev<span>Sync</span></h1>
                 </div>
-                <p id="ws-url-display">Initializing connection...</p>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <p id="ws-url-display">Initializing connection...</p>
+                    <span class="project-badge" id="project-display" style="display: none;"></span>
+                </div>
             </div>
             <div class="header-right">
-                <div class="status-badge" id="editor-status-container" style="display: none; margin-right: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);">
+                <div class="status-badge" id="editor-status-container">
                     <div id="editor-status-dot" class="status-dot"></div>
                     <span id="editor-status-text">Editor Offline</span>
                 </div>
@@ -47,6 +50,11 @@
             <div class="search-box">
                 <i data-lucide="search"></i>
                 <input type="text" id="task-search" placeholder="Search tasks...">
+            </div>
+            <div class="project-box">
+                <i data-lucide="folder-kanban"></i>
+                <input type="text" id="project-id-input" placeholder="Project ID (DefaultProject)" spellcheck="false"
+                    autocomplete="off">
             </div>
             <div style="flex: 1;"></div>
             <div id="last-sync-time" class="sync-info">Last sync: Never</div>
