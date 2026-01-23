@@ -1,4 +1,6 @@
-const wsUrl = 'wss://node-server-ws.onrender.com';
+const wsUrl = (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || !location.hostname)
+    ? 'ws://localhost:8080'
+    : 'wss://node-server-ws.onrender.com';
 let socket = null;
 let currentTasks = [];
 let reconnectTimer = null;
@@ -24,6 +26,11 @@ const elements = {
         InProgress: document.getElementById('count-inprogress'),
         Completed: document.getElementById('count-completed'),
         Blocked: document.getElementById('count-blocked')
+    },
+    editorStatus: {
+        container: document.getElementById('editor-status-container'),
+        dot: document.getElementById('editor-status-dot'),
+        text: document.getElementById('editor-status-text')
     }
 };
 
@@ -62,7 +69,15 @@ function updateStatus(status) {
     }
 }
 
-function renderBoard(tasks) {
+function updateEditorStatus(isOnline) {
+    if (!elements.editorStatus.container) return;
+
+    elements.editorStatus.container.style.display = 'flex';
+    elements.editorStatus.dot.className = 'status-dot ' + (isOnline ? 'connected' : 'error');
+    elements.editorStatus.text.textContent = isOnline ? 'Editor Online' : 'Editor Offline';
+}
+
+function renderBoard(tasks, isCached = false) {
     currentTasks = tasks;
     const filter = elements.searchBox.value.toLowerCase();
 
@@ -100,7 +115,8 @@ function renderBoard(tasks) {
         elements.counts[key].textContent = columnCounts[key];
     });
 
-    elements.lastSyncTime.textContent = `LAST SYNC: ${new Date().toLocaleTimeString()}`;
+    const syncLabel = isCached ? 'LAST SYNC (CACHED)' : 'LAST SYNC';
+    elements.lastSyncTime.textContent = `${syncLabel}: ${new Date().toLocaleTimeString()}`;
 }
 
 function createTaskCard(task, index) {
@@ -155,6 +171,7 @@ function connect() {
         socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
+                console.log(`Received ${data.type} from ${data.sender}`);
 
                 // Filtering: If targetId is set and doesn't match our sessionId, ignore the message
                 if (data.targetId && data.targetId !== sessionId) {
@@ -162,10 +179,20 @@ function connect() {
                     return;
                 }
 
+                if (data.type === 'editor_status') {
+                    updateEditorStatus(data.status === 'online');
+                }
+
                 if (data.type === 'task_sync' && data.payload) {
+                    if (data.editorOffline !== undefined) {
+                        updateEditorStatus(!data.editorOffline);
+                    } else if (data.sender === 'editor') {
+                        updateEditorStatus(true);
+                    }
+
                     const taskData = JSON.parse(data.payload);
                     if (taskData.Tasks) {
-                        renderBoard(taskData.Tasks);
+                        renderBoard(taskData.Tasks, data.isCached);
                     }
                 }
             } catch (e) {
