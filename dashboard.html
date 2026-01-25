@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UnityDev Sync • Dashboard</title>
+    <link rel="stylesheet" href="websocket-logger.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono&display=swap"
+        rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <div class="glow-bg"></div>
+    <div class="container">
+        <header>
+            <div class="title-group">
+                <div class="logo">
+                    <i data-lucide="layers"></i>
+                    <h1>UnityDev<span>Sync</span></h1>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <p id="ws-url-display">Initializing connection...</p>
+                    <span class="project-badge" id="project-display" style="display: none;"></span>
+                    <span class="member-badge" id="member-display" style="display: none;"></span>
+                    <div class="presence-container" id="presence-list"></div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="status-badge" id="editor-status-container">
+                    <div id="editor-status-dot" class="status-dot"></div>
+                    <span id="editor-status-text">Editor Offline</span>
+                </div>
+                <div class="status-badge" id="status-container">
+                    <div id="status-dot" class="status-dot"></div>
+                    <span id="status-text">Offline</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="controls">
+            <button id="connect-btn" class="btn btn-primary">
+                <i data-lucide="zap"></i> Connect Live
+            </button>
+            <button id="disconnect-btn" class="btn" disabled>
+                <i data-lucide="power"></i> Disconnect
+            </button>
+            <div class="divider"></div>
+            <div class="search-box">
+                <i data-lucide="search"></i>
+                <input type="text" id="task-search" placeholder="Search tasks...">
+            </div>
+            <div style="flex: 1;"></div>
+            <div id="last-sync-time" class="sync-info">Last sync: Never</div>
+            <div class="divider"></div>
+            <button id="switch-project-btn" class="btn">
+                <i data-lucide="log-out"></i> Switch Project
+            </button>
+        </div>
+
+        <div class="board-container">
+            <!-- Column: Pending -->
+            <div class="board-column" data-status="Pending">
+                <div class="column-header">
+                    <div class="column-title-group">
+                        <i data-lucide="circle"></i>
+                        <span class="column-title">Pending</span>
+                    </div>
+                    <span class="column-count" id="count-pending">0</span>
+                </div>
+                <div class="column-list" id="list-pending"></div>
+            </div>
+
+            <!-- Column: In Progress -->
+            <div class="board-column" data-status="InProgress">
+                <div class="column-header">
+                    <div class="column-title-group">
+                        <i data-lucide="play-circle"></i>
+                        <span class="column-title">In Progress</span>
+                    </div>
+                    <span class="column-count" id="count-inprogress">0</span>
+                </div>
+                <div class="column-list" id="list-inprogress"></div>
+            </div>
+
+            <!-- Column: Completed -->
+            <div class="board-column" data-status="Completed">
+                <div class="column-header">
+                    <div class="column-title-group">
+                        <i data-lucide="check-circle"></i>
+                        <span class="column-title">Completed</span>
+                    </div>
+                    <span class="column-count" id="count-completed">0</span>
+                </div>
+                <div class="column-list" id="list-completed"></div>
+            </div>
+
+            <!-- Column: Blocked -->
+            <div class="board-column" data-status="Blocked">
+                <div class="column-header">
+                    <div class="column-title-group">
+                        <i data-lucide="alert-octagon"></i>
+                        <span class="column-title">Blocked</span>
+                    </div>
+                    <span class="column-count" id="count-blocked">0</span>
+                </div>
+                <div class="column-list" id="list-blocked"></div>
+            </div>
+        </div>
+
+        <footer>
+            &copy; 2024 Unity Productivity Tools • Jira-Style Task Sync Board
+        </footer>
+    </div>
+
+    <script src="websocket-logger.js"></script>
+</body>
+
+</html>

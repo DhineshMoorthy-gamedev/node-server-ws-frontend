@@ -5,6 +5,7 @@ let socket = null;
 let currentTasks = [];
 let reconnectTimer = null;
 let currentProjectId = localStorage.getItem('lastProjectId') || '';
+let currentMemberName = localStorage.getItem('lastMemberName') || '';
 const sessionId = Math.random().toString(36).substring(2, 11); // Generate unique session ID
 
 const elements = {
@@ -22,12 +23,6 @@ const elements = {
         Completed: document.getElementById('list-completed'),
         Blocked: document.getElementById('list-blocked')
     },
-    counts: {
-        Pending: document.getElementById('count-pending'),
-        InProgress: document.getElementById('count-inprogress'),
-        Completed: document.getElementById('count-completed'),
-        Blocked: document.getElementById('count-blocked')
-    },
     editorStatus: {
         container: document.getElementById('editor-status-container'),
         dot: document.getElementById('editor-status-dot'),
@@ -36,8 +31,20 @@ const elements = {
     project: {
         input: document.getElementById('project-id-input'),
         display: document.getElementById('project-display')
-    }
+    },
+    member: {
+        input: document.getElementById('member-name-input'),
+        display: document.getElementById('member-display')
+    },
+    joinBtn: document.getElementById('join-btn'),
+    switchBtn: document.getElementById('switch-project-btn'),
+    errorMsg: document.getElementById('error-message'),
+    presenceList: document.getElementById('presence-list')
 };
+
+const isInvitePage = location.pathname.endsWith('index.html') || location.pathname.endsWith('/') || (!location.pathname.includes('.html') && !location.pathname.includes('dashboard'));
+const isDashboardPage = location.pathname.includes('dashboard.html');
+const platform = 'Web Dashboard';
 
 const statusMapping = {
     0: 'Pending', 1: 'InProgress', 2: 'Completed', 3: 'Blocked',
@@ -87,16 +94,69 @@ function updateEditorStatus(isOnline, projectId = null) {
 
 function updateProjectDisplay() {
     if (elements.project.display) {
-        elements.project.display.textContent = currentProjectId;
+        elements.project.display.textContent = currentProjectId ? `CODE: ${currentProjectId}` : '';
         elements.project.display.style.display = currentProjectId ? 'inline-block' : 'none';
     }
     if (elements.project.input) {
         elements.project.input.value = currentProjectId;
     }
+
+    if (elements.member.display) {
+        elements.member.display.textContent = currentMemberName ? `NAME: ${currentMemberName}` : '';
+        elements.member.display.style.display = currentMemberName ? 'inline-block' : 'none';
+    }
+    if (elements.member.input) {
+        elements.member.input.value = currentMemberName;
+    }
 }
 
 function showStatusMessage(msg) {
-    elements.lastSyncTime.textContent = msg.toUpperCase();
+    if (elements.lastSyncTime) {
+        elements.lastSyncTime.textContent = msg.toUpperCase();
+    }
+}
+
+function updatePresenceUI(clients) {
+    if (!elements.presenceList) return;
+
+    if (!clients || clients.length === 0) {
+        elements.presenceList.innerHTML = '';
+        return;
+    }
+
+    // Filter out ourselves
+    const others = clients.filter(c => c.SenderId !== sessionId);
+
+    if (others.length === 0) {
+        elements.presenceList.innerHTML = '';
+        return;
+    }
+
+    elements.presenceList.innerHTML = others.map(client => {
+        const icon = getPlatformIcon(client.Platform);
+        return `
+            <div class="presence-badge" title="${client.Name} (${client.Platform}) • Last seen ${client.LastSeen}">
+                <i data-lucide="${icon}"></i>
+                <span>${client.Name}</span>
+            </div>
+        `;
+    }).join('');
+
+    // Refresh Lucide icons
+    if (window.lucide) {
+        window.lucide.createIcons({
+            root: elements.presenceList
+        });
+    }
+}
+
+function getPlatformIcon(platformStr) {
+    const p = (platformStr || '').toLowerCase();
+    if (p.includes('editor')) return 'monitor';
+    if (p.includes('android') || p.includes('iphone') || p.includes('ios')) return 'smartphone';
+    if (p.includes('web') || p.includes('browser') || p.includes('dashboard')) return 'globe';
+    if (p.includes('windows') || p.includes('mac')) return 'laptop';
+    return 'user';
 }
 
 function renderBoard(tasks, isCached = false) {
@@ -105,17 +165,8 @@ function renderBoard(tasks, isCached = false) {
 
     // Clear and Reset
     Object.values(elements.lists).forEach(list => list.innerHTML = '');
-    const columnCounts = { Pending: 0, InProgress: 0, Completed: 0, Blocked: 0 };
 
-    // If no project is specified (explicitly), don't show any cards
-    if (!currentProjectId) {
-        Object.keys(columnCounts).forEach(key => {
-            elements.counts[key].textContent = '0';
-        });
-        elements.lastSyncTime.textContent = 'Please specify a Project ID to view tasks.';
-        updateEditorStatus(false);
-        return;
-    }
+    // If no project is specified
 
     tasks.forEach((task, index) => {
         const title = (task.Title || '').toLowerCase();
@@ -129,7 +180,6 @@ function renderBoard(tasks, isCached = false) {
         const listEl = elements.lists[statusKey];
 
         if (listEl) {
-            columnCounts[statusKey]++;
             const card = createTaskCard(task, index);
             listEl.appendChild(card);
 
@@ -142,11 +192,6 @@ function renderBoard(tasks, isCached = false) {
         }
     });
 
-    // Update Meta
-    Object.keys(columnCounts).forEach(key => {
-        elements.counts[key].textContent = columnCounts[key];
-    });
-
     const syncLabel = isCached ? 'LAST SYNC (CACHED)' : 'LAST SYNC';
     elements.lastSyncTime.textContent = `${syncLabel}: ${new Date().toLocaleTimeString()}`;
 }
@@ -157,7 +202,8 @@ function createTaskCard(task, index) {
     card.style.animationDelay = `${index * 0.05}s`;
 
     const priority = typeof task.Priority === 'number' ? priorityMapping[task.Priority] : (task.Priority || 'Medium');
-    const initials = task.Assignee ? task.Assignee.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : '??';
+    const assigneeInitials = task.Assignee ? task.Assignee.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : '??';
+    const assignerInitials = task.Assigner ? task.Assigner.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : '??';
 
     let linksHtml = '';
     if (task.Links && task.Links.length > 0) {
@@ -179,9 +225,18 @@ function createTaskCard(task, index) {
         <div class="task-desc">${task.Description || 'No metadata available for this task.'}</div>
         ${linksHtml}
         <div class="task-footer">
-            <div class="task-assignee">
-                <div class="avatar-circle">${initials}</div>
-                <span>${task.Assignee || 'Unassigned'}</span>
+            <div class="task-people">
+                <div class="person-info" title="Assignee">
+                    <div class="avatar-circle">${assigneeInitials}</div>
+                    <span>${task.Assignee || 'Unassigned'}</span>
+                </div>
+                <div class="person-link">
+                    <i data-lucide="arrow-right"></i>
+                </div>
+                <div class="person-info" title="Assigner">
+                    <div class="avatar-circle assigner-avatar">${assignerInitials}</div>
+                    <span>${task.Assigner || 'Admin'}</span>
+                </div>
             </div>
             <div class="priority-label label-${priority}">${priority}</div>
         </div>
@@ -219,15 +274,29 @@ function connect() {
 
             // Only request initial sync if project is set
             if (currentProjectId) {
+                // 1. Join Project
+                if (currentMemberName) {
+                    socket.send(JSON.stringify({
+                        sender: 'mobile',
+                        senderId: sessionId,
+                        projectId: currentProjectId,
+                        platform: platform,
+                        type: 'member_join',
+                        payload: currentMemberName
+                    }));
+                }
+
+                // 2. Request Sync
                 socket.send(JSON.stringify({
                     sender: 'mobile',
                     senderId: sessionId,
                     projectId: currentProjectId,
+                    platform: platform,
                     type: 'request_sync',
                     payload: 'Initialize Dashboard'
                 }));
             } else {
-                showStatusMessage("Select a Project to begin");
+                showStatusMessage("Enter Invite Code to begin");
             }
 
             if (reconnectTimer) {
@@ -272,6 +341,12 @@ function connect() {
                     }
 
                     const taskData = JSON.parse(data.payload);
+
+                    // Update presence UI
+                    if (taskData.ActiveClients) {
+                        updatePresenceUI(taskData.ActiveClients);
+                    }
+
                     if (taskData.Tasks && taskData.Tasks.length > 0) {
                         renderBoard(taskData.Tasks, data.isCached);
                     } else {
@@ -315,45 +390,66 @@ function disconnect() {
     if (socket) socket.close();
 }
 
-// Event Listeners
-elements.connectBtn.addEventListener('click', () => {
-    if (reconnectTimer) clearInterval(reconnectTimer);
-    connect();
-});
-elements.disconnectBtn.addEventListener('click', disconnect);
-elements.searchBox.addEventListener('input', () => renderBoard(currentTasks));
-elements.project.input.addEventListener('change', () => {
-    const val = elements.project.input.value.trim();
-    currentProjectId = val;
-    localStorage.setItem('lastProjectId', currentProjectId);
+// --- Page Specific Initialization ---
 
-    // Refresh UI for new project context
-    updateProjectDisplay();
-    renderBoard([]); // Clear current board
+function initInvitePage() {
+    if (elements.project.input) elements.project.input.value = currentProjectId;
+    if (elements.member.input) elements.member.input.value = currentMemberName;
 
-    if (!currentProjectId) {
-        updateEditorStatus(false);
-        elements.lastSyncTime.textContent = 'Please select a project.';
+    elements.joinBtn.addEventListener('click', () => {
+        const code = elements.project.input.value.trim();
+        const name = elements.member.input.value.trim();
+
+        if (!code || !name) {
+            elements.errorMsg.textContent = "Please provide both an Invite Code and Member Name.";
+            elements.errorMsg.style.display = 'block';
+            return;
+        }
+
+        currentProjectId = code;
+        currentMemberName = name;
+        localStorage.setItem('lastProjectId', code);
+        localStorage.setItem('lastMemberName', name);
+
+        // Redirect to dashboard (now dashboard.html)
+        location.href = 'dashboard.html';
+    });
+}
+
+function initDashboardPage() {
+    // Check for credentials
+    if (!currentProjectId || !currentMemberName) {
+        location.href = 'index.html';
         return;
     }
 
-    elements.lastSyncTime.textContent = 'Last sync: Switching project...';
+    // Connect automatically
+    connect();
 
-    // Request sync for new project
-    if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({
-            sender: 'mobile',
-            senderId: sessionId,
-            projectId: currentProjectId,
-            type: 'request_sync',
-            payload: 'Project Switch Sync'
-        }));
+    // Event Listeners for Dashboard
+    if (elements.connectBtn) elements.connectBtn.addEventListener('click', () => {
+        if (reconnectTimer) clearInterval(reconnectTimer);
+        connect();
+    });
+
+    if (elements.disconnectBtn) elements.disconnectBtn.addEventListener('click', disconnect);
+    if (elements.searchBox) elements.searchBox.addEventListener('input', () => renderBoard(currentTasks));
+
+    if (elements.switchBtn) {
+        elements.switchBtn.addEventListener('click', () => {
+            disconnect();
+            location.href = 'index.html';
+        });
     }
-});
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     if (window.lucide) window.lucide.createIcons();
-    connect();
-});
 
+    if (isInvitePage) {
+        initInvitePage();
+    } else {
+        initDashboardPage();
+    }
+});

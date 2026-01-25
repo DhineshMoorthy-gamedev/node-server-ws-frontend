@@ -13,6 +13,8 @@
     --accent-success: #00ffa3;
     --accent-warning: #ffd000;
     --accent-danger: #ff2e5b;
+    --accent-red: #ff4d4d;
+    --member-color: #fce38a;
 
     --text-main: #e6edf3;
     --text-dim: #8b949e;
@@ -230,22 +232,48 @@ header::after {
     transform: none !important;
 }
 
-.search-box {
+.search-box,
+.project-box,
+.member-box {
     position: relative;
-    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.search-box {
+    flex: 2;
     max-width: 400px;
 }
 
-.search-box i {
+.project-box {
+    flex: 1;
+    min-width: 150px;
+}
+
+.member-box {
+    flex: 1;
+    min-width: 150px;
+}
+
+.search-box i,
+.project-box i,
+.member-box i,
+.search-box svg,
+.project-box svg,
+.member-box svg {
     position: absolute;
     left: 12px;
     top: 50%;
     transform: translateY(-50%);
     width: 16px;
+    height: 16px;
     color: var(--text-dim);
+    pointer-events: none;
 }
 
-.search-box input {
+.search-box input,
+.project-box input,
+.member-box input {
     width: 100%;
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid var(--border-glass);
@@ -257,52 +285,28 @@ header::after {
     transition: all 0.2s;
 }
 
-.search-box input:focus {
+.search-box input:focus,
+.project-box input:focus,
+.member-box input:focus {
     outline: none;
     border-color: var(--accent-primary);
     background: rgba(0, 0, 0, 0.4);
     box-shadow: var(--glow-cyan);
 }
 
+.project-box input:focus {
+    border-color: var(--accent-secondary);
+    box-shadow: var(--glow-purple);
+}
+
+/* Sync Info Styling */
 .sync-info {
     font-family: var(--font-mono);
     font-size: 0.65rem;
     color: var(--text-dim);
     text-transform: uppercase;
     opacity: 0.6;
-}
-
-.project-box {
-    position: relative;
-    width: 200px;
-}
-
-.project-box i {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 14px;
-    color: var(--text-dim);
-}
-
-.project-box input {
-    width: 100%;
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid var(--border-glass);
-    border-radius: var(--radius-sm);
-    padding: 0.5rem 1rem 0.5rem 2.2rem;
-    color: #fff;
-    font-family: var(--font-ui);
-    font-size: 0.75rem;
-    transition: all 0.2s;
-}
-
-.project-box input:focus {
-    outline: none;
-    border-color: var(--accent-secondary);
-    background: rgba(0, 0, 0, 0.4);
-    box-shadow: var(--glow-purple);
+    margin-left: 1rem;
 }
 
 /* Fix Autofill background issue */
@@ -316,17 +320,7 @@ input:-webkit-autofill:active {
     transition: background-color 5000s ease-in-out 0s;
 }
 
-.project-badge {
-    font-family: var(--font-mono);
-    font-size: 0.6rem;
-    color: var(--accent-secondary);
-    background: rgba(157, 0, 255, 0.1);
-    border: 1px solid rgba(157, 0, 255, 0.2);
-    padding: 1px 8px;
-    border-radius: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
+/* Board Content */
 
 /* Board Redesign */
 .board-container {
@@ -376,12 +370,9 @@ input:-webkit-autofill:active {
 }
 
 .column-count {
+    display: none;
     font-size: 0.7rem;
-    font-family: var(--font-mono);
-    background: var(--surface-glass-bright);
-    padding: 2px 10px;
-    border-radius: 100px;
-    color: var(--text-dim);
+    /* ... rest of properties kept for potential restoration if needed, but display none will hide it */
 }
 
 .column-list {
@@ -494,6 +485,69 @@ input:-webkit-autofill:active {
     transition: all 0.2s ease;
 }
 
+.project-badge,
+.member-badge {
+    padding: 2px 8px;
+    background: rgba(100, 210, 255, 0.1);
+    /* Assuming --accent-blue is intended here */
+    border: 1px solid rgba(100, 210, 255, 0.2);
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent-primary);
+    /* Changed from --accent-blue to --accent-primary for consistency */
+    text-transform: uppercase;
+}
+
+.member-badge {
+    background: rgba(252, 227, 138, 0.1);
+    border-color: rgba(252, 227, 138, 0.2);
+    color: var(--member-color);
+}
+
+/* Presence UI */
+.presence-container {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: 1rem;
+}
+
+.presence-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 4px 10px;
+    background: rgba(0, 242, 255, 0.08);
+    border: 1px solid rgba(0, 242, 255, 0.15);
+    border-radius: 20px;
+    font-size: 0.7rem;
+    color: var(--accent-primary);
+    animation: presenceFadeIn 0.4s ease-out;
+}
+
+.presence-badge i {
+    width: 14px;
+    height: 14px;
+    opacity: 0.8;
+}
+
+.presence-badge span {
+    font-weight: 500;
+}
+
+@keyframes presenceFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
 .link-item:hover {
     background: rgba(255, 255, 255, 0.08);
     border-color: var(--accent-primary);
@@ -515,27 +569,51 @@ input:-webkit-autofill:active {
     margin-top: 1rem;
 }
 
-.task-assignee {
+.task-people {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
+    gap: 0.75rem;
+}
+
+.person-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.person-link {
+    display: flex;
+    align-items: center;
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+
+.person-link svg {
+    width: 12px;
+    height: 12px;
 }
 
 .avatar-circle {
     width: 24px;
     height: 24px;
     border-radius: 6px;
-    background: linear-gradient(135deg, var(--accent-secondary), #6b00ff);
+    background: linear-gradient(135deg, var(--accent-primary), #00aaff);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 0.6rem;
     font-weight: 900;
-    color: #fff;
-    box-shadow: 0 0 10px rgba(157, 0, 255, 0.3);
+    color: #000;
+    box-shadow: 0 0 10px rgba(0, 242, 255, 0.2);
 }
 
-.task-assignee span {
+.assigner-avatar {
+    background: linear-gradient(135deg, var(--accent-secondary), #6b00ff);
+    color: #fff;
+    box-shadow: 0 0 10px rgba(157, 0, 255, 0.2);
+}
+
+.person-info span {
     font-size: 0.7rem;
     font-weight: 500;
     color: var(--text-dim);
@@ -609,6 +687,163 @@ footer {
     font-weight: 500;
     letter-spacing: 0.05em;
     text-transform: uppercase;
+}
+
+/* --- Onboarding Page (invite.html) --- */
+.onboarding-page {
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+.onboarding-container {
+    width: 100%;
+    max-width: 500px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.onboarding-card {
+    background: var(--surface-glass);
+    border: 1px solid var(--border-glass-sharp);
+    backdrop-filter: blur(40px);
+    border-radius: var(--radius-lg);
+    padding: 3rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    text-align: center;
+}
+
+.logo-large {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.logo-large i {
+    width: 64px;
+    height: 64px;
+    color: var(--accent-primary);
+    filter: drop-shadow(0 0 15px var(--accent-primary));
+}
+
+.logo-large h1 {
+    font-size: 2.2rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    background: linear-gradient(to right, #fff, #94a3b8);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.onboarding-subtitle {
+    color: var(--text-dim);
+    font-size: 1rem;
+    line-height: 1.6;
+    margin-bottom: 3rem;
+    opacity: 0.8;
+}
+
+.onboarding-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    text-align: left;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.input-group label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--accent-primary);
+    letter-spacing: 0.1em;
+    padding-left: 4px;
+}
+
+.invite-input-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.invite-input-box i {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    color: var(--text-dim);
+}
+
+.invite-input-box input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    padding: 1rem 1rem 1rem 3.5rem;
+    color: #fff;
+    font-size: 1rem;
+    transition: all 0.3s;
+}
+
+.invite-input-box input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    background: rgba(0, 0, 0, 0.5);
+    box-shadow: var(--glow-cyan);
+}
+
+.btn-large {
+    padding: 1.2rem;
+    font-size: 1rem;
+    justify-content: center;
+    margin-top: 1rem;
+    border-radius: var(--radius-md);
+}
+
+.error-text {
+    color: var(--accent-danger);
+    font-size: 0.85rem;
+    margin-top: 1.5rem;
+    padding: 0.8rem;
+    background: rgba(255, 46, 91, 0.1);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 46, 91, 0.2);
+}
+
+.onboarding-footer {
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
 }
 
 /* --- Responsive & Mobile Optimization --- */
