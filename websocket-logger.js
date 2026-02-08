@@ -12,6 +12,11 @@ const sessionId = Math.random().toString(36).substring(2, 11); // Generate uniqu
 const elements = {
     inviteForm: document.getElementById('invite-form'),
     noInviteMsg: document.getElementById('no-invite-message'),
+    authSection: document.getElementById('auth-section'),
+    userInfo: document.getElementById('user-info'),
+    userAvatar: document.getElementById('user-avatar'),
+    userName: document.getElementById('user-name'),
+    authenticatedContent: document.getElementById('authenticated-content'),
     statusDot: document.getElementById('status-dot'),
     statusText: document.getElementById('status-text'),
     statusContainer: document.getElementById('status-container'),
@@ -393,6 +398,56 @@ function disconnect() {
     if (socket) socket.close();
 }
 
+// --- Authentication Handlers ---
+
+function handleCredentialResponse(response) {
+    const responsePayload = decodeJwtResponse(response.credential);
+
+    const userData = {
+        name: responsePayload.name,
+        email: responsePayload.email,
+        picture: responsePayload.picture
+    };
+
+    localStorage.setItem('googleUser', JSON.stringify(userData));
+    applyUserData(userData);
+}
+
+function decodeJwtResponse(token) {
+    var base64Url = token.split('.')[1];
+    var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    var jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+
+    return JSON.parse(jsonPayload);
+}
+
+function applyUserData(user) {
+    if (!user) return;
+
+    currentMemberName = user.name;
+    localStorage.setItem('lastMemberName', user.name);
+
+    if (elements.userInfo) {
+        elements.userInfo.style.display = 'flex';
+        elements.userName.textContent = user.name;
+        elements.userAvatar.src = user.picture;
+    }
+
+    if (elements.authSection) elements.authSection.style.display = 'none';
+    if (elements.authenticatedContent) elements.authenticatedContent.style.display = 'block';
+
+    if (elements.member.input) elements.member.input.value = user.name;
+}
+
+window.logout = function () {
+    localStorage.removeItem('googleUser');
+    location.reload();
+};
+
+window.handleCredentialResponse = handleCredentialResponse;
+
 // --- Page Specific Initialization ---
 
 function initInvitePage() {
@@ -401,10 +456,34 @@ function initInvitePage() {
     const urlProjectId = params.get('projectId');
     const urlName = params.get('name');
 
-    if (!urlProjectId) {
-        if (elements.inviteForm) elements.inviteForm.style.display = 'none';
-        if (elements.noInviteMsg) elements.noInviteMsg.style.display = 'block';
-        return;
+    if (urlProjectId) {
+        currentProjectId = urlProjectId;
+        localStorage.setItem('lastProjectId', urlProjectId);
+    }
+
+    if (urlName) {
+        currentMemberName = urlName;
+        localStorage.setItem('lastMemberName', urlName);
+    }
+
+    // Check existing auth
+    const savedUser = localStorage.getItem('googleUser');
+    if (savedUser) {
+        applyUserData(JSON.parse(savedUser));
+
+        // After login, check if we actually have a project to join
+        if (!urlProjectId) {
+            if (elements.inviteForm) elements.inviteForm.style.display = 'none';
+            if (elements.noInviteMsg) elements.noInviteMsg.style.display = 'block';
+        } else {
+            if (elements.inviteForm) elements.inviteForm.style.display = 'block';
+            if (elements.noInviteMsg) elements.noInviteMsg.style.display = 'none';
+        }
+    } else {
+        // Not logged in: Show auth button, hide everything else
+        if (elements.authSection) elements.authSection.style.display = 'block';
+        if (elements.authenticatedContent) elements.authenticatedContent.style.display = 'none';
+        if (elements.noInviteMsg) elements.noInviteMsg.style.display = 'none';
     }
 
     currentProjectId = urlProjectId;
@@ -439,6 +518,12 @@ function initInvitePage() {
 }
 
 function initDashboardPage() {
+    // Check for auth
+    if (!localStorage.getItem('googleUser')) {
+        location.href = 'index.html';
+        return;
+    }
+
     // Check for credentials
     if (!currentProjectId || !currentMemberName) {
         location.href = 'index.html';
