@@ -8,7 +8,10 @@ let currentProjectId = localStorage.getItem('lastProjectId') || '';
 let currentMemberName = localStorage.getItem('lastMemberName') || '';
 const sessionId = Math.random().toString(36).substring(2, 11); // Generate unique session ID
 
+// --- Elements ---
 const elements = {
+    inviteForm: document.getElementById('invite-form'),
+    noInviteMsg: document.getElementById('no-invite-message'),
     statusDot: document.getElementById('status-dot'),
     statusText: document.getElementById('status-text'),
     statusContainer: document.getElementById('status-container'),
@@ -393,6 +396,25 @@ function disconnect() {
 // --- Page Specific Initialization ---
 
 function initInvitePage() {
+    // Parse URL Parameters
+    const params = new URLSearchParams(window.location.search);
+    const urlProjectId = params.get('projectId');
+    const urlName = params.get('name');
+
+    if (!urlProjectId) {
+        if (elements.inviteForm) elements.inviteForm.style.display = 'none';
+        if (elements.noInviteMsg) elements.noInviteMsg.style.display = 'block';
+        return;
+    }
+
+    currentProjectId = urlProjectId;
+    localStorage.setItem('lastProjectId', urlProjectId);
+
+    if (urlName) {
+        currentMemberName = urlName;
+        localStorage.setItem('lastMemberName', urlName);
+    }
+
     if (elements.project.input) elements.project.input.value = currentProjectId;
     if (elements.member.input) elements.member.input.value = currentMemberName;
 

@@ -25,13 +25,13 @@
 
             <p class="onboarding-subtitle">Connect with your team and sync Unity tasks in real-time.</p>
 
-            <div class="onboarding-form">
+            <div class="onboarding-form" id="invite-form">
                 <div class="input-group">
                     <label>Invite Code</label>
                     <div class="invite-input-box">
                         <i data-lucide="ticket"></i>
                         <input type="text" id="project-id-input" placeholder="Enter code (e.g. MyMegaProject)"
-                            spellcheck="false">
+                            spellcheck="false" readonly>
                     </div>
                 </div>
 
@@ -47,6 +47,14 @@
                 <button id="join-btn" class="btn btn-primary btn-large">
                     <i data-lucide="zap"></i> Join Project Workspace
                 </button>
+            </div>
+
+            <div id="no-invite-message" style="display: none; text-align: center; padding: 20px;">
+                <div style="background: rgba(255, 107, 107, 0.1); border: 1px solid #ff6b6b; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                    <i data-lucide="shield-alert" style="color: #ff6b6b; width: 48px; height: 48px; margin-bottom: 10px;"></i>
+                    <h3 style="color: #ff6b6b; margin-bottom: 10px;">Access Restricted</h3>
+                    <p style="font-size: 0.9em; opacity: 0.8;">This project workspace is invite-only. Please use the link provided in your invitation email to join.</p>
+                </div>
             </div>
 
             <div id="error-message" class="error-text" style="display: none;"></div>
